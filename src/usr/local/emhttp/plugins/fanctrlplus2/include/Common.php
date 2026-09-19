@@ -79,7 +79,8 @@ function build_pwm_map(): array {
 
         $chip = normalize_chip_name(trim(file_get_contents($name_file)));
 
-        foreach (glob("$dir/pwm[0-9]") as $pwm_path) {
+        foreach (glob("$dir/pwm*") as $pwm_path) {
+            if (!preg_match('/^pwm\d+$/', basename($pwm_path))) continue;
             $pwmN = basename($pwm_path);
             $real = realpath($pwm_path) ?: $pwm_path;
             $map["$chip:$pwmN"] = $real;
@@ -234,15 +235,16 @@ function migrate_cfg_and_labels(string $plugin): void {
 
 function list_pwm() {
   $out = [];
-  exec("find /sys/devices -type f -iname 'pwm[0-9]' -exec dirname \"{}\" + | uniq", $chips);
+  exec("find /sys/devices -type f -regextype posix-extended -regex '.*/pwm[0-9]+' -exec dirname \"{}\" + | uniq", $chips);
   foreach ($chips as $chip) {
     $name = is_file("$chip/name") ? trim(file_get_contents("$chip/name")) : '';
-    foreach (glob("$chip/pwm[0-9]") as $pwm) {
+    foreach (glob("$chip/pwm*") as $pwm) {
+      if (!preg_match('/^pwm\d+$/', basename($pwm))) continue;
       $out[] = ['chip' => $name, 'name' => basename($pwm), 'sensor' => $pwm];
     }
   }
 
-  usort($out, fn($a, $b) => strcmp($a['name'], $b['name']));
+  usort($out, fn($a, $b) => strnatcmp($a['name'], $b['name']));
   return $out;
 }
 
