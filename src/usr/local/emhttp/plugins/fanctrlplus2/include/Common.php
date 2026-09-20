@@ -235,8 +235,15 @@ function migrate_cfg_and_labels(string $plugin): void {
 
 function list_pwm() {
   $out = [];
-  exec("find /sys/devices -type f -regextype posix-extended -regex '.*/pwm[0-9]+' -exec dirname \"{}\" + | uniq", $chips);
-  foreach ($chips as $chip) {
+  // Enumerate via /sys/class/hwmon, same as build_pwm_map() above -- avoids
+  // a shell exec() + GNU-only `find -regextype` (unavailable on some find
+  // implementations), and glob("pwm*") + a strict regex filter correctly
+  // excludes per-channel attributes (pwm1_enable, pwm1_auto_point1_pwm,
+  // etc.) that a bare "pwm[0-9]*" pattern would also match, since a glob
+  // char class only consumes one character before the trailing "*" takes
+  // over -- "pwm[0-9]*" still matches "pwm1_enable" the same way "pwm*"
+  // does.
+  foreach (glob('/sys/class/hwmon/hwmon*') as $chip) {
     $name = is_file("$chip/name") ? trim(file_get_contents("$chip/name")) : '';
     foreach (glob("$chip/pwm*") as $pwm) {
       if (!preg_match('/^pwm\d+$/', basename($pwm))) continue;
